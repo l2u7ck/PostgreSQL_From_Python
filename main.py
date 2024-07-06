@@ -121,37 +121,48 @@ def delete_user(user_id):
 
 
 # User search by user data
-def search_user(first_name, last_name, email, number):
+def search_user(key, value):
 
-    if first_name != 0:
-        cur.execute(f"""
-                SELECT * FROM users 
-                WHERE first_name = {first_name}
-                """)
+    status = True
 
-    if last_name != 0:
-        cur.execute(f"""
-                SELECT * FROM users 
-                WHERE last_name = {last_name}
-                """)
-
-    if email != 0:
-        cur.execute(f"""
-                SELECT * FROM users 
-                WHERE email = {email}
-                """)
-
-    if number != 0:
+    if 'first_name' == key:
         cur.execute(f"""
                 SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u  
                 LEFT JOIN phones p ON p.user_id = u.user_id         
-                WHERE u.user_id=(SELECT user_id FROM phones WHERE number = '{number}')
+                WHERE u.user_id = (SELECT user_id FROM users WHERE first_name = '{value}')
                 """)
-    new_cur = tuple()
-    for item in set(cur.fetchall()):
-        new_cur += item
+    elif 'last_name' == key:
+        cur.execute(f"""
+                SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u  
+                LEFT JOIN phones p ON p.user_id = u.user_id         
+                WHERE u.user_id = (SELECT user_id FROM users WHERE last_name = '{value}')
+                """)
+    elif 'email' == key:
+        cur.execute(f"""
+                SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u  
+                LEFT JOIN phones p ON p.user_id = u.user_id         
+                WHERE u.user_id = (SELECT user_id FROM users WHERE email = '{value}')
+                """)
+    elif 'number' == key:
+        cur.execute(f"""
+                SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u  
+                LEFT JOIN phones p ON p.user_id = u.user_id         
+                WHERE u.user_id=(SELECT user_id FROM phones WHERE number='{value}')
+                """)
+    else:
+        print("Incorrect key: ", key)
+        print("Correct key: first_name, last_name, email or number")
+        status = False
 
-    print("Found user: ", tuple(dict.fromkeys(new_cur)))
+    if status:
+        new_cur = tuple()
+        for item in set(cur.fetchall()):
+            new_cur += item
+
+        if len(tuple(dict.fromkeys(new_cur))) != 0:
+            print("Found user: ", tuple(dict.fromkeys(new_cur)))
+        else:
+            print("Incorrect value entered or there is no user with this value")
 
 
 if __name__ == '__main__':
@@ -167,6 +178,6 @@ if __name__ == '__main__':
         #update_data_user(1, "Jen", 0, 0)
         #delete_phone(1)
         #delete_user(1)
-        #search_user(0, 0, 0, '89106343610')
+        search_user('number', '89106343610')
 
     conn.close()
