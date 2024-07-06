@@ -44,8 +44,9 @@ def addition_phone(phone_id, number, user_id):
     cur.execute(f"""
         INSERT INTO phones VALUES ({phone_id},{number},{user_id}) RETURNING phone_id, number, user_id;
         """)
+
     conn.commit()
-    print("Addition phone:",cur.fetchone())
+    print("Addition phone:", cur.fetchone())
 
 
 # Change information about user
@@ -69,13 +70,12 @@ def update_data_user(user_id, first_name, last_name, email):
                 WHERE user_id=%s
                 """, (f"{email}", f"{user_id}"))
 
-    print()
-
     cur.execute(f"""
         SELECT * FROM users;
         """)
+
     conn.commit()
-    print("Update user data: ",cur.fetchone())
+    print("Update user data: ", cur.fetchone())
 
 
 # Delete the phone of an existing user
@@ -120,14 +120,53 @@ def delete_user(user_id):
     conn.commit()
 
 
-conn = psycopg2.connect(database='database_from_python', user='postgres', password='1324')
-with conn.cursor() as cur:
-    #create_tables()
-    #addition_user(1, 'Jason', 'Miller', 'ker@gmail.com')
-    #addition_phone(1, '89106343610 ', 1)
-    #addition_phone(2, '89146343610 ', 1)
-    #update_data_user(1, "Jen", 0, 0)
-    #delete_phone(1)
-    delete_user(1)
+# User search by user data
+def search_user(first_name, last_name, email, number):
 
-conn.close()
+    if first_name != 0:
+        cur.execute(f"""
+                SELECT * FROM users 
+                WHERE first_name = {first_name}
+                """)
+
+    if last_name != 0:
+        cur.execute(f"""
+                SELECT * FROM users 
+                WHERE last_name = {last_name}
+                """)
+
+    if email != 0:
+        cur.execute(f"""
+                SELECT * FROM users 
+                WHERE email = {email}
+                """)
+
+    if number != 0:
+        cur.execute(f"""
+                SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u  
+                LEFT JOIN phones p ON p.user_id = u.user_id         
+                WHERE u.user_id=(SELECT user_id FROM phones WHERE number = '{number}')
+                """)
+    new_cur = tuple()
+    for item in set(cur.fetchall()):
+        new_cur += item
+
+    print("Found user: ", tuple(dict.fromkeys(new_cur)))
+
+
+if __name__ == '__main__':
+
+    conn = psycopg2.connect(database='database_from_python', user='postgres', password='1324')
+    with conn.cursor() as cur:
+
+        #create_tables()
+        #addition_user(1, 'Jason', 'Miller', 'ker@gmail.com')
+        #addition_phone(1, '89106343610 ', 1)
+        #addition_phone(2, '89146343610 ', 1)
+        #addition_phone(3, '89777343610 ', 1)
+        #update_data_user(1, "Jen", 0, 0)
+        #delete_phone(1)
+        #delete_user(1)
+        #search_user(0, 0, 0, '89106343610')
+
+    conn.close()
