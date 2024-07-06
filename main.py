@@ -14,7 +14,8 @@ def create_tables():
                 user_id SERIAL PRIMARY KEY,
                 first_name  varchar(50) NOT NULL,
                 last_name varchar(50) NOT NULL,
-                email varchar(50) NOT NULL
+                email varchar(50) NOT NULL,
+                CHECK (email LIKE '%@%.%')
             )
             """)
 
@@ -22,7 +23,8 @@ def create_tables():
             CREATE TABLE IF NOT EXISTS phones(
                 phone_id SERIAL PRIMARY KEY,
                 number char(12) NOT NULL,
-                user_id INTEGER NOT NULL REFERENCES users(user_id)
+                user_id INTEGER NOT NULL REFERENCES users(user_id),
+                CHECK (number LIKE '+7%' OR number LIKE '8%')
             )
             """)
 
@@ -31,8 +33,9 @@ def create_tables():
 
 # Addition user data base
 def addition_user(user_id, first_name, last_name, email):
-    cur.execute("""
-        INSERT INTO users VALUES (1,'Jason','Miller','ker@gmail.com') RETURNING user_id, first_name, last_name, email;
+    cur.execute(f"""
+        INSERT INTO users VALUES ({user_id}, '{first_name}', '{last_name}', '{email}') 
+        RETURNING user_id, first_name, last_name, email;
         """)
     conn.commit()
     print("Addition user:", cur.fetchone())
@@ -42,7 +45,8 @@ def addition_user(user_id, first_name, last_name, email):
 def addition_phone(phone_id, number, user_id):
 
     cur.execute(f"""
-        INSERT INTO phones VALUES ({phone_id},{number},{user_id}) RETURNING phone_id, number, user_id;
+        INSERT INTO phones VALUES ({phone_id},'{number}',{user_id}) 
+        RETURNING phone_id, number, user_id;
         """)
 
     conn.commit()
@@ -170,14 +174,14 @@ if __name__ == '__main__':
     conn = psycopg2.connect(database='database_from_python', user='postgres', password='1324')
     with conn.cursor() as cur:
 
-        #create_tables()
-        #addition_user(1, 'Jason', 'Miller', 'ker@gmail.com')
-        #addition_phone(1, '89106343610 ', 1)
-        #addition_phone(2, '89146343610 ', 1)
-        #addition_phone(3, '89777343610 ', 1)
+        create_tables()
+        addition_user(1, 'Jason', 'Miller', 'ker@gmail.com')
+        addition_phone(1, '+79106343610', 1)
+        addition_phone(2, '89146343610', 1)
+        #addition_phone(3, '+79777343610', 1)
         #update_data_user(1, "Jen", 0, 0)
         #delete_phone(1)
         #delete_user(1)
-        search_user('number', '89106343610')
+        #search_user('number', '89106343610')
 
     conn.close()
