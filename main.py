@@ -28,40 +28,36 @@ def create_tables(cur):
             )
             """)
 
-    conn.commit()
-
 
 # Addition user data base
 def add_user(cur, first_name, last_name, email, numbers=None):
 
     try:
-        cur.execute(f"""
-
-                INSERT INTO users(first_name, last_name, email) VALUES ('{first_name}', '{last_name}', '{email}')
+        cur.execute("""
+                INSERT INTO users(first_name, last_name, email) VALUES (%s, %s, %s)
                 RETURNING user_id;
-                """)
+                """, (first_name, last_name, email))
         user_id = cur.fetchone()[0]
 
         if numbers is not None:
             if not isinstance(numbers, tuple):
                 numbers = (numbers,)
             for item in numbers:
-                cur.execute(f"""
-                            INSERT INTO phones(number, user_id) VALUES ('{item}',{user_id})
-                            """)
+                cur.execute("""
+                            INSERT INTO phones(number, user_id) VALUES (%s, %s)
+                            """, (item, user_id))
 
-        cur.execute(f"""
+        cur.execute("""
                     SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u
                     LEFT JOIN phones p ON p.user_id = u.user_id
-                    WHERE u.user_id = {user_id}
-                    """)
+                    WHERE u.user_id = %s
+                    """, (user_id, ))
 
         # Create of understandable data output
         new_cur = tuple()
         for item in set(cur.fetchall()):
             new_cur += item
 
-        conn.commit()
         print("Addition user: ", tuple(dict.fromkeys(new_cur)))
 
     except psycopg2.errors.CheckViolation as e:
@@ -75,12 +71,11 @@ def add_user(cur, first_name, last_name, email, numbers=None):
 def add_phone(cur, number, user_id):
 
     try:
-        cur.execute(f"""
-            INSERT INTO phones(number, user_id) VALUES ('{number}',{user_id}) 
+        cur.execute("""
+            INSERT INTO phones(number, user_id) VALUES (%s, %s) 
             RETURNING phone_id, number, user_id;
-            """)
+            """, (number, user_id))
 
-        conn.commit()
         print("Addition phone:", cur.fetchone())
 
     except psycopg2.errors.CheckViolation as e:
@@ -119,10 +114,10 @@ def update_data_user(cur, user_id, first_name=None, last_name=None, email=None, 
                     """, (email, user_id))
 
         if numbers is not None:
-            cur.execute(f"""
+            cur.execute("""
                     SELECT phone_id FROM phones
-                    WHERE user_id = {user_id}
-                    """)
+                    WHERE user_id = %s
+                    """, (user_id, ))
 
             # Updating phone numbers
             """
@@ -141,23 +136,22 @@ def update_data_user(cur, user_id, first_name=None, last_name=None, email=None, 
             if not isinstance(numbers, tuple):
                 numbers = (numbers,)
             for item in zip(numbers, all_phones_user):
-                cur.execute(f"""
+                cur.execute("""
                         UPDATE phones SET number=%s
                         WHERE phone_id=%s
                         """, (item[0], item[1]))
 
-        cur.execute(f"""
+        cur.execute("""
             SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u  
             LEFT JOIN phones p ON p.user_id = u.user_id         
-            WHERE u.user_id = {user_id}
-            """)
+            WHERE u.user_id = %s
+            """, (user_id, ))
 
         # Create of understandable data output
         new_cur = tuple()
         for item in set(cur.fetchall()):
             new_cur += item
 
-        conn.commit()
         print("Update user data: ", tuple(dict.fromkeys(new_cur)))
 
     except psycopg2.errors.CheckViolation as e:
@@ -176,17 +170,15 @@ def update_data_user(cur, user_id, first_name=None, last_name=None, email=None, 
 # Delete the phone of an existing user
 def delete_phone(cur, phone_id):
     try:
-        cur.execute(f"""
+        cur.execute("""
                     SELECT * FROM phones
-                    WHERE phone_id = {phone_id}
-                    """)
+                    WHERE phone_id = %s 
+                    """, (phone_id, ))
         print("Data that was deleted of phones: ", cur.fetchone())
 
-        cur.execute(f"""
-                DELETE FROM phones WHERE phone_id = {phone_id}
-                """)
-
-        conn.commit()
+        cur.execute("""
+                DELETE FROM phones WHERE phone_id = %s
+                """, (phone_id, ))
 
     except psycopg2.errors.InFailedSqlTransaction as e:
         print(f"Error when updating user data: {e}")
@@ -196,11 +188,11 @@ def delete_phone(cur, phone_id):
 def delete_user(cur, user_id):
 
     try:
-        cur.execute(f"""
+        cur.execute("""
                     SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u  
                     LEFT JOIN phones p ON p.user_id = u.user_id         
-                    WHERE u.user_id = {user_id}
-                    """)
+                    WHERE u.user_id = %s
+                    """, (user_id, ))
 
         new_cur = tuple()
         for item in set(cur.fetchall()):
@@ -208,79 +200,47 @@ def delete_user(cur, user_id):
 
         print("Data that was deleted about user: ", tuple(dict.fromkeys(new_cur)))
 
-        cur.execute(f"""
-               DELETE FROM phones WHERE user_id = {user_id}
-               """)
+        cur.execute("""
+               DELETE FROM phones WHERE user_id = %s
+               """, (user_id, ))
 
-        cur.execute(f"""
-                   DELETE FROM users WHERE user_id = {user_id}
-                   """)
-
-        conn.commit()
+        cur.execute("""
+                   DELETE FROM users WHERE user_id = %s
+                   """, (user_id, ))
 
     except psycopg2.errors.InFailedSqlTransaction as e:
         print(f"Error when updating user data: {e}")
 
 
 # User search by user data
-def search_user(cur, first_name=None, last_name=None, email=None, number=None):
+def search_user(cur, first_name='%', last_name='%', email='%', number='%'):
 
     try:
-        # result_search - stores tuples with query results (user_id)
-        result_search = list()
-        if first_name is not None:
-            cur.execute(f"""
-                        SELECT user_id FROM users 
-                        WHERE first_name = '{first_name}'
-                        """)
-            result_search.append(set(cur.fetchall()))
 
-        if last_name is not None:
-            cur.execute(f"""
-                        SELECT user_id FROM users 
-                        WHERE last_name = '{last_name}'
-                        """)
-            result_search.append(set(cur.fetchall()))
+        cur.execute("""
+                SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u  
+                LEFT JOIN phones p ON p.user_id = u.user_id         
+                WHERE first_name LIKE (%s) 
+                    AND last_name LIKE (%s) 
+                    AND email LIKE (%s) 
+                    AND (number LIKE (%s) OR number LIKE (null)) 
+                """, (first_name, last_name, email, number))
 
-        if email is not None:
-            cur.execute(f"""
-                        SELECT user_id FROM users 
-                        WHERE email = '{email}'
-                        """)
-            result_search.append(set(cur.fetchall()))
-
-        if number is not None:
-            cur.execute(f"""
-                        SELECT user_id FROM phones 
-                        WHERE number='{number}'
-                        """)
-            result_search.append(set(cur.fetchall()))
-
-        # Search for the user index by intersecting tuples from the query
-        user_id = result_search[0]
-        for item in result_search[1:]:
-            user_id &= item
-
-        if len(user_id) == 1:
-            user_id = list(user_id)[0][0]
-
-            cur.execute(f"""
-                        SELECT DISTINCT u.user_id, first_name, last_name, email, number FROM users u  
-                        LEFT JOIN phones p ON p.user_id = u.user_id         
-                        WHERE u.user_id = {user_id}
-                        """)
-
-            # Create of understandable data output
-            new_cur = tuple()
-            for item in set(cur.fetchall()):
-                new_cur += item
-
-            if len(tuple(dict.fromkeys(new_cur))) != 0:
-                print("Found user: ", tuple(dict.fromkeys(new_cur)))
+        # Create of understandable data output
+        users_dict = dict()
+        for item in set(cur.fetchall()):
+            if item[0] in users_dict.keys():
+                users_dict[item[0]] += (item[4], )
             else:
-                print("Incorrect value entered or there is no user with this value")
+                users_dict[item[0]] = item
+
+        if len(users_dict) != 0:
+            print("Found users: ")
+            for item in sorted(users_dict.items()):
+                print(item[1])
+            print()
         else:
-            print("More than one user has this data. Add another search parameter.")
+            print("Incorrect value entered or there is no user with this value")
 
     except psycopg2.errors.InFailedSqlTransaction as e:
         print(f"Error when updating user data: {e}")
@@ -288,8 +248,9 @@ def search_user(cur, first_name=None, last_name=None, email=None, number=None):
 
 if __name__ == '__main__':
 
-    conn = psycopg2.connect(database='database_from_python', user='postgres', password='1324')
-    with conn.cursor() as curs:
+    with psycopg2.connect(database='database_from_python', user='postgres', password='1324') as curs:
+
+        curs = curs.cursor()
 
         create_tables(curs)
         add_user(curs, 'Jason', 'Baker', 'ker@gmail.com', ('89777777777', '89666666666'))
@@ -299,9 +260,10 @@ if __name__ == '__main__':
         add_phone(curs, '+79010101010', 1)
         # update_data_user(curs, 2, "Jon", numbers=('81593609777', '82598946777'))
         # update_data_user(curs, 2, "Jon", "Adams", None, '89900000009')
-        # delete_phone(curs,2)
+        # delete_phone(curs, 2)
         # delete_user(curs, 1)
-        # search_user(curs,  number='82598946777')
+        # search_user(curs, 'Jason', 'Baker')
+        # search_user(curs, last_name='Baker')
 
         # Error checking
         # add_user(curs, 'Ray ', 'Kroc', 'makyandex.ru')
@@ -311,4 +273,4 @@ if __name__ == '__main__':
         # delete_user(curs, 999)
         # search_user(curs, 'Jerry', 'Baker', number='89444444444')
 
-    conn.close()
+        curs.close()
